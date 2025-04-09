@@ -1,55 +1,50 @@
-Terraform Automation: Deploy Jenkins and SonarQube with Nexus
+🚀 Terraform-Powered DevOps Deployment: Jenkins + SonarQube + Nexus
+Welcome to your all-in-one Terraform automation setup for deploying a modern DevOps stack on AWS! This project spins up two EC2 instances and auto-installs:
 
-Overview
+WebServer1: Docker, Java, Docker Compose, Jenkins
 
-This project automates the provisioning of two EC2 instances using Terraform:
-
-WebServer1: Installs Docker, Java, Docker Compose, and runs a Jenkins container.
-
-WebServer2: Installs Docker and runs SonarQube and Nexus as Docker containers.
+WebServer2: Docker, Java, SonarQube, Nexus Repository Manager
 
 📁 Project Structure
-
+bash
+Copy
+Edit
 terraform-vanila/
-├── main.tf
-├── variables.tf
-├── terraform.tfvars
-├── install_webserver1.sh
-├── install_webserver2.sh
+├── main.tf                  # Core Terraform config
+├── variables.tf             # Input variable definitions
+├── terraform.tfvars         # Values for variables
+├── install_webserver1.sh    # Jenkins setup
+├── install_webserver2.sh    # SonarQube + Nexus setup
+⚙️ Prerequisites
+✅ An AWS Account
 
-🔧 Prerequisites
+✅ Terraform v1.5+
 
-AWS Account & Credentials
+✅ A valid AWS Key Pair (.pem) for SSH
 
-Terraform installed (>= 1.5)
+✅ Ubuntu-based AMI (e.g., ami-03f4878755434977f for ap-south-1)
 
-An AWS key pair for SSH access
-
-Ubuntu-compatible AMI ID (e.g., ami-03f4878755434977f for ap-south-1)
-
-🔨 Step-by-Step Setup
-
-1. Define Variables (variables.tf)
-
+🏗️ What This Deploys
+Instance	Services Installed	Ports Exposed
+WebServer1	Java, Docker, Jenkins	8080 (Jenkins), 50000
+WebServer2	Java, Docker, SonarQube, Nexus Repository	9000 (SonarQube), 8081
+📦 Setup Instructions
+1️⃣ Define Your Variables (variables.tf)
+hcl
+Copy
+Edit
 variable "key_name" {
   description = "AWS Key Pair Name"
   type        = string
 }
+2️⃣ Edit Terraform Configuration (main.tf)
+Use the templatefile() function to pass install scripts to EC2's user_data.
 
-2. Terraform Configuration (main.tf)
-
-Creates VPC, subnet, route tables, internet gateway.
-
-Deploys two EC2 instances.
-
-Uses templatefile() to inject user_data scripts.
-
-Make sure to reference your key name and ensure templatefile() reads from your install scripts.
-
-3. Install Scripts
-
-install_webserver1.sh (Jenkins)
-
+⚙️ Installation Scripts
+🖥️ install_webserver1.sh (Jenkins Setup)
+bash
+Copy
+Edit
 #!/bin/bash
 exec > /var/log/user-data.log 2>&1
 set -x
@@ -57,13 +52,14 @@ set -x
 sudo apt update && sudo apt install -y docker.io openjdk-17-jre-headless
 sudo usermod -aG docker ubuntu && newgrp docker
 
-sudo docker run -d \
+docker run -d \
   -p 8080:8080 -p 50000:50000 \
   --name jenkins \
   jenkins/jenkins:lts
-
-install_webserver2.sh (SonarQube & Nexus)
-
+🖥️ install_webserver2.sh (SonarQube + Nexus Setup)
+bash
+Copy
+Edit
 #!/bin/bash
 exec > /var/log/user-data.log 2>&1
 set -x
@@ -71,91 +67,80 @@ set -x
 sudo apt update && sudo apt install -y docker.io openjdk-17-jre-headless
 sudo usermod -aG docker ubuntu && newgrp docker
 
-# Add swap memory fallback
+# Add swap memory for JVM-heavy apps
 fallocate -l 2G /swapfile
 chmod 600 /swapfile
 mkswap /swapfile
 swapon /swapfile
 
 # Run SonarQube
-sudo docker run -d --name sonarqube \
-  -p 9000:9000 \
-  sonarqube
+docker run -d --name sonarqube -p 9000:9000 sonarqube
 
 # Run Nexus
-sudo docker run -d --name nexus \
-  -p 8081:8081 \
-  sonatype/nexus3
-
-🚀 Deployment Steps
-
+docker run -d --name nexus -p 8081:8081 sonatype/nexus3
+🚀 Deploy the Infrastructure
+bash
+Copy
+Edit
 terraform init
 terraform plan
 terraform apply
-
-✅ Post-Deployment Checks
-
-1. SSH into instances
-
+🔎 Post-Deployment Verification
+✅ SSH into the Instances
+bash
+Copy
+Edit
 ssh -i your-key.pem ubuntu@<public-ip>
-
-2. Verify Jenkins (on WebServer1)
-
-docker ps    # Jenkins container should be running
-
-Access via http://<public-ip>:8080
+✅ Jenkins (WebServer1)
+Access UI: http://<web1-public-ip>:8080
 
 Get initial admin password:
 
+bash
+Copy
+Edit
 docker exec -it jenkins cat /var/jenkins_home/secrets/initialAdminPassword
+✅ SonarQube & Nexus (WebServer2)
+SonarQube: http://<web2-public-ip>:9000
+Login: admin / admin
 
-3. Verify SonarQube & Nexus (on WebServer2)
+Nexus: http://<web2-public-ip>:8081
+Login: admin
+Password:
 
-docker ps    # Both containers should be running
-
-SonarQube: http://<public-ip>:9000  (Default: admin/admin)
-
-Nexus: http://<public-ip>:8081  (Default: admin / password from /nexus-data/admin.password)
-
-🛠️ Troubleshooting
-
-Issue: Software not installed after launch
-
-Solution:
-
-Check cloud-init logs:
-
+bash
+Copy
+Edit
+docker exec -it nexus cat /nexus-data/admin.password
+🧯 Troubleshooting Guide
+🔹 EC2 Launched but Software Not Installed?
+bash
+Copy
+Edit
 cat /var/log/user-data.log
+Check for permission errors, download failures, or syntax errors in your script.
 
-Ensure install_webserver*.sh scripts are executable and correctly referenced in templatefile().
+🔹 Nexus/SonarQube Crashing?
+JVM memory issues are common. Check container logs:
 
-Issue: Docker container fails due to memory
-
-Solution:
-
-Check container logs:
-
+bash
+Copy
+Edit
 docker logs <container-id>
+Add swap memory (already included in install_webserver2.sh).
 
-Add swap memory as shown above.
-
-Issue: Permissions error using Docker
-
-Solution:
-
-Ensure the ubuntu user is added to the docker group:
-
+🔹 Docker Command Fails with Permissions Error?
+bash
+Copy
+Edit
 sudo usermod -aG docker ubuntu && newgrp docker
+💣 Clean Up
+When you're done:
 
-📌 Notes
-
-set -x in scripts enables logging of all shell commands.
-
-Use templatefile() over file() for dynamic scripts.
-
-Don't forget to destroy the infra when done:
-
+bash
+Copy
+Edit
 terraform destroy
-
-Happy Automating! 🚀
+🙌 Wrap-up
+You've now got a fully automated setup for your DevOps tooling with Terraform, Docker, and AWS. Whether you're practicing CI/CD or just exploring infrastructure as code—this stack is a powerful foundation to build upon. 🎯
 
